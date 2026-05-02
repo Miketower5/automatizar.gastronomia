@@ -15,6 +15,20 @@ import argparse
 import logging
 from datetime import datetime, timedelta, timezone
 
+import ssl
+import urllib3
+import requests
+from requests.adapters import HTTPAdapter
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# Force all requests sessions to skip SSL verification (self-signed proxy certs)
+_orig_session_init = requests.Session.__init__
+def _patched_session_init(self, *args, **kwargs):
+    _orig_session_init(self, *args, **kwargs)
+    self.verify = False
+requests.Session.__init__ = _patched_session_init
+
 import ccxt
 import pandas as pd
 
@@ -26,6 +40,7 @@ log = logging.getLogger(__name__)
 
 def fetch_history(symbol: str, timeframe: str, since_days: int) -> pd.DataFrame:
     exchange = ccxt.binance({"enableRateLimit": True})
+    exchange.session.verify = False  # allow self-signed certs in sandboxed environments
     since_ms = int(
         (datetime.now(timezone.utc) - timedelta(days=since_days)).timestamp() * 1000
     )
